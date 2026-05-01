@@ -30,3 +30,7 @@ profiles/
 
 # Local env
 .env
+
+# example binaries
+examples/*/server
+examples/*/client
