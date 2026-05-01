@@ -43,3 +43,4 @@ lib/src/*.o
 # example binaries
 examples/*/hello
 examples/*/allreduce
+examples/*/stress
