@@ -35,3 +35,10 @@ profiles/
 examples/*/server
 examples/*/client
 examples/*/vec_add
+
+# library build
+lib/*.a
+lib/src/*.o
+
+# example binaries
+examples/*/hello
