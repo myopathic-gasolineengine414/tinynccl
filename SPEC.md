@@ -118,7 +118,8 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 
 ### Phase 3: PyTorch integration
 
-- [ ] **Milestone 3.1**: Minimal `ProcessGroup` backend exposing only `all_reduce`.
+- [x] **Milestone 3.0**: pybind11 bindings exposing `Comm::all_reduce(torch::Tensor)`. See `examples/11-pytorch-bindings/`. Not a full `c10d::Backend` yet — just a Python wrapper that proves the tensor data path works through both transports.
+- [ ] **Milestone 3.1**: Minimal `ProcessGroup` backend (subclass `c10d::Backend`) exposing only `all_reduce`. Wraps the bindings from 3.0 so `torch.distributed.init_process_group(backend="tinynccl")` works and DDP can route through the library.
 - [ ] **Milestone 3.2**: Toy DDP training loop (e.g. MNIST MLP) using tinynccl backend.
 - [ ] **Milestone 3.3**: 50M-param GPT on TinyShakespeare, two-rank training to convergence.
 - [ ] **Milestone 3.4**: Numerical correctness vs NCCL on the same loop.
