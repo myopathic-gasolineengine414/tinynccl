@@ -45,3 +45,5 @@ examples/*/hello
 examples/*/allreduce
 examples/*/stress
 examples/*/model.pt
+examples/*/model.pt
+examples/*/tinyshakespeare.txt

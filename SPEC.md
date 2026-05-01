@@ -123,7 +123,8 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 - [x] **Milestone 3.2**: Toy DDP training loop using tinynccl backend. See `examples/13-ddp-train/`. Two ranks each train a small MLP on different data via `DistributedDataParallel`; gradient all-reduce flows through tinynccl; weights stay consistent across ranks (max diff `0.00e+00`). Required adding `allgather` / `_allgather_base` / `broadcast` / `barrier` and `Work::getFuture()` to the c10d::Backend.
 - [x] **Milestone 3.3**: GPU DDP training with tinynccl. See `examples/14-ddp-gpu/`. Two CUDA contexts on the same GTX 1080 Ti; model and data on GPU; gradient all-reduce flows through tinynccl with pinned-host staging (since softRoCE + consumer GeForce can't do GPUDirect RDMA). Weights consistent across ranks at machine precision after training. (50M-param GPT deferred — small MLP demonstrates the technique end-to-end.)
 - [x] **Milestone 3.4**: Real DDP training that learns a non-trivial function. See `examples/15-ddp-sine/`. MLP fits `y = sin(2πx)` across two ranks, loss drops 0.21 → 0.016, RMSE on held-out grid ~0.14. Standalone `infer.py` loads saved weights and produces matching predictions.
-- [ ] **Milestone 3.5**: Numerical correctness vs NCCL on the same training loop (deferred — needs NCCL set up against our CUDA build).
+- [x] **Milestone 3.5**: Mini char-level GPT on TinyShakespeare. See `examples/16-ddp-gpt/`. ~10.7M-param transformer trained 3000 steps via DDP through tinynccl on the GTX 1080 Ti (two CUDA contexts). Loss 4.344 → 1.124 in 14:20 wall time. Sample output produces real Shakespeare character names, dialogue structure, and pseudo-iambic phrasing.
+- [ ] **Milestone 3.6**: Numerical correctness vs NCCL on the same training loop (deferred — needs NCCL configured against our CUDA build).
 
 ### Phase 4: Benchmarking and writeup
 
