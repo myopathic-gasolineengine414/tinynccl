@@ -1,6 +1,26 @@
 # tinynccl — A Tiny NCCL from Scratch
 
-A from-scratch C++/CUDA implementation of GPU collective communication operations (specifically all-reduce), built on libibverbs over softRoCE, integrated with PyTorch as a custom `ProcessGroup` backend. Trains a real model end-to-end across two physical machines using transport code I wrote myself.
+A from-scratch C++/CUDA implementation of GPU collective communication operations (specifically all-reduce), built on libibverbs over softRoCE, integrated with PyTorch as a custom `c10d::Backend`. Trains a real model end-to-end using transport code I wrote myself.
+
+---
+
+## Current status (2026-05-01)
+
+**Phase 0 (single-machine foundation): done.** Five working examples (TCP echo, libibverbs hello-world, CUDA vec_add, GPU+verbs SEND/RECV, RDMA WRITE_WITH_IMM). Full softRoCE/rxe stack on the desktop with persistent systemd unit.
+
+**Phase 2 (all-reduce algorithms): done on single machine.** Built a `lib/` with a `Comm` abstraction over pluggable transports (TCP + verbs). Validated naive 2-rank all-reduce on CPU buffers, GPU buffers (via pinned-host staging), and at scale via a stress harness.
+
+**Phase 3 (PyTorch integration): done.** Custom `c10d::Backend` subclass that PyTorch's `torch.distributed.init_process_group(backend="tinynccl")` and `DistributedDataParallel` route through. Implements `allreduce`, `allgather`, `_allgather_base`, `broadcast`, `barrier`, plus `Work::getFuture()` for DDP's hook chaining. Both CPU and CUDA tensors handled (CUDA tensors stage through pinned host because softRoCE + consumer GPU can't do GPUDirect RDMA).
+
+**End-to-end milestone reached.** Trained a 10.7M-param char-level GPT on TinyShakespeare across two GPU ranks (sharing one GTX 1080 Ti via separate CUDA contexts) using DDP via tinynccl. Loss 4.344 → 1.124 over 3000 steps in 14:20 wall time. Sample output produces real Shakespeare character names and dialogue structure.
+
+**Phase 1 (cross-machine on physical network): blocked** on the laptop's USB drive arriving so we can install Ubuntu and bring up the second physical endpoint. Once available: rerun the verbs hello-world and GPT training across the direct ethernet cable for credible perf numbers.
+
+**Phase 4 (benchmarks vs NCCL): planned post-laptop.** Compare tinynccl latency/throughput against real NCCL on the same workload, with honest documentation of the gaps and their causes (lack of NVLink, lack of hardware RDMA, no GPUDirect, no GPU-resident reductions, etc.).
+
+### Real bug found and fixed during Phase 3
+
+Initial verbs transport cached `ibv_reg_mr` results by buffer address to amortize registration cost. Gave a 64x speedup at small messages, but turned out unsafe when integrated with PyTorch: the allocator recycles virtual addresses while remapping the underlying physical pages, leaving cached MR entries pointing at stale memory. Symptom: DDP's parameter-shape verification reported phantom mismatches because broadcast was returning data from the wrong physical pages. Fix: register-and-deregister per call. Future work: opt-in `register_persistent` API for caller-owned stable buffers to recover the perf benefit safely.
 
 ---
 
