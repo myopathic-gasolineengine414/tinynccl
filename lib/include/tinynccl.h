@@ -7,6 +7,8 @@
 namespace tinynccl {
 
 enum class Backend { TCP, Verbs };
+enum class DataType { Float32 };
+enum class ReduceOp { Sum };
 
 class Comm {
 public:
@@ -21,6 +23,13 @@ public:
 
     virtual int send(const void* buf, size_t bytes) = 0;
     virtual int recv(void* buf, size_t bytes) = 0;
+
+    // In-place all-reduce. Naive 2-rank only for now.
+    virtual int all_reduce(
+        void* buf,
+        size_t count,
+        DataType dtype = DataType::Float32,
+        ReduceOp op = ReduceOp::Sum) = 0;
 
     int rank() const { return rank_; }
     int world_size() const { return world_size_; }
