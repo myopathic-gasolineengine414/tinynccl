@@ -84,14 +84,14 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 - [x] ssh key auth from Mac to `personal`
 - [x] git repo skeleton on `personal` at `~/tinynccl`
 - [ ] VS Code Remote-SSH from Mac to `personal`
-- [ ] GitHub remote configured, first commit pushed
-- [ ] `apt update && apt upgrade` on `personal` to clear pending updates
-- [ ] Install build dependencies: `build-essential cmake git libibverbs-dev librdmacm-dev rdma-core`
-- [ ] CUDA Toolkit 12.x installed and verified (`nvcc --version`, `nvidia-smi`)
-- [ ] Load `rdma_rxe` module: `sudo modprobe rdma_rxe`
-- [ ] Configure RXE device on loopback or wlp10s0: `sudo rdma link add rxe0 type rxe netdev <iface>`
-- [ ] Verify with `ibv_devices` and `ibv_devinfo`
-- [ ] **Milestone 0.1**: TCP echo program in C++, two processes on same machine. ~50 LOC.
+- [x] GitHub remote configured, first commit pushed (https://github.com/jwlutz/tinynccl, private)
+- [x] `apt update && apt upgrade` on `personal` to clear pending updates
+- [x] Install build dependencies: `build-essential cmake git libibverbs-dev librdmacm-dev rdma-core ibverbs-utils perftest`
+- [ ] CUDA Toolkit 12.x installed and verified (deferred — NVIDIA driver also not present; install when Milestone 0.3 needs it)
+- [x] Load `rdma_rxe` module (persisted via `/etc/modules-load.d/rdma_rxe.conf`)
+- [x] Configure RXE device on `wlp10s0` (runtime only — needs re-add after reboot)
+- [x] Verify with `ibv_devices` and `ibv_devinfo` (rxe0 ACTIVE, GUID 522e91fffe08b558)
+- [x] **Milestone 0.1**: TCP echo program in C++, two processes on same machine. See `examples/01-tcp-echo/`.
 - [ ] **Milestone 0.2**: libibverbs hello-world in C, two processes on same machine talking via RXE loopback. ~200 LOC. Sender posts an RDMA write of 1 byte, receiver polls completion queue. Covers: device open, PD allocation, MR registration, QP creation, QP state transitions (INIT → RTR → RTS), post send/recv, CQ polling.
 - [ ] **Milestone 0.3**: CUDA hello-world. Vector add kernel on the 1080 Ti. `cudaMalloc`, `cudaMemcpy`, kernel launch, validate result.
 - [ ] **Milestone 0.4**: Register CUDA buffer with `ibv_reg_mr`, demonstrate that a GPU-resident buffer can be the source/sink of a verbs operation (single-machine RXE loopback). This is the GPU-NIC integration point.
