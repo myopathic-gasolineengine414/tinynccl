@@ -248,10 +248,14 @@ private:
             addr.sin_family = AF_INET;
             addr.sin_port = htons(port);
             ::inet_pton(AF_INET, peer_host.c_str(), &addr.sin_addr);
-            if (::connect(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
-                std::perror("connect"); ::close(fd); return -1;
+            for (int retry = 0; retry < 50; ++retry) {
+                if (::connect(fd, (sockaddr*)&addr, sizeof(addr)) == 0) return fd;
+                if (errno != ECONNREFUSED) { std::perror("connect"); ::close(fd); return -1; }
+                ::usleep(100000);
             }
-            return fd;
+            std::perror("connect (after retries)");
+            ::close(fd);
+            return -1;
         }
     }
 

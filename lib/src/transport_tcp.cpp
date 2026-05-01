@@ -47,9 +47,14 @@ public:
                 std::fprintf(stderr, "invalid peer host: %s\n", peer_host.c_str());
                 return -1;
             }
-            if (::connect(fd_, (sockaddr*)&addr, sizeof(addr)) < 0) {
-                ::perror("connect"); return -1;
+            // Retry on ECONNREFUSED so the listener has time to come up.
+            for (int retry = 0; retry < 50; ++retry) {
+                if (::connect(fd_, (sockaddr*)&addr, sizeof(addr)) == 0) return 0;
+                if (errno != ECONNREFUSED) { ::perror("connect"); return -1; }
+                ::usleep(100000); // 100ms
             }
+            ::perror("connect (after retries)");
+            return -1;
         }
         return 0;
     }
