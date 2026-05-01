@@ -1,33 +1,14 @@
-# Milestone 0.1: TCP echo
+# 0.1: tcp echo
 
-Two-process TCP echo on a single machine. Server listens, client sends a string, server echoes back, client prints it. Server then exits.
+Two-process TCP echo on a single machine. Server listens on port 5000, client sends a string, server echoes it back, server exits.
 
-## Build and run
+Here mainly to confirm the build pipeline works and to baseline the BSD socket API before swapping it out for verbs in 0.2.
 
-```
-make run
-```
+Run:
 
-Or in two separate terminals:
+    make run
 
-```
-# terminal 1
-./server
+Or in two terminals:
 
-# terminal 2
-./client
-```
-
-`./client <host> <port> <message>` overrides the defaults (127.0.0.1, 5000, "hello, tinynccl").
-
-## What this proves
-
-- Build pipeline (g++, Makefile) works end-to-end on `personal`.
-- BSD sockets API works: `socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`.
-- The server-client two-process model on one box is functional, which is the structural skeleton every later milestone reuses.
-
-## What this is not
-
-This is intentionally the smallest possible thing. No threading, no error recovery beyond perror, no graceful shutdown, no message framing, single connection then exit. Each later milestone adds one new concept to this baseline.
-
-The next milestone (`02-verbs-hello`) replaces `send`/`recv` with `ibv_post_send`/`ibv_post_recv` over softRoCE, keeping the surrounding two-process structure identical.
+    ./server
+    ./client [host] [port] [message]
