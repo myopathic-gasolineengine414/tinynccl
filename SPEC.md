@@ -112,7 +112,7 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 
 - [x] **Milestone 2.1**: CPU all-reduce over TCP. Two ranks, float arrays, validate correctness. See `examples/07-allreduce-tcp/`. Naive: rank 0 sends, rank 1 sends; both sum locally. `lib/` now has `Comm::all_reduce(buf, count, dtype, op)` for Float32/Sum.
 - [x] **Milestone 2.2**: CPU all-reduce over verbs. Replace TCP transport with verbs, same correctness. See `examples/08-allreduce-verbs/`. `lib/` now has a verbs backend (`transport_verbs.cpp`) that registers buffers on the fly per send/recv. Same `all_reduce` algorithm carries through unchanged.
-- [ ] **Milestone 2.3**: GPU all-reduce over verbs (single chunk, naive 2-node).
+- [x] **Milestone 2.3**: GPU all-reduce over verbs (single chunk, naive 2-rank). See `examples/09-allreduce-gpu/`. Two processes both `cudaMalloc` on the 1080 Ti, all-reduce over verbs with pinned-host staging. Real distributed-training-style gradient sync, single machine.
 - [ ] **Milestone 2.4**: Ring all-reduce decomposition (chunked).
 - [ ] **Milestone 2.5**: Performance instrumentation. Per-call latency, throughput, busy-wait vs blocking polling.
 
