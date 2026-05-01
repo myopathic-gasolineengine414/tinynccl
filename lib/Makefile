@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -Iinclude -Isrc
 
 LIB = libtinynccl.a
-OBJS = src/tinynccl.o src/transport_tcp.o
+OBJS = src/tinynccl.o src/transport_tcp.o src/transport_verbs.o
 
 all: $(LIB)
 

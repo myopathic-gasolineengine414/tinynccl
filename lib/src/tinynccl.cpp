@@ -75,8 +75,8 @@ std::unique_ptr<Comm> Comm::create(
             t = make_tcp_transport();
             break;
         case Backend::Verbs:
-            std::fprintf(stderr, "tinynccl: verbs backend not yet wired up\n");
-            return nullptr;
+            t = make_verbs_transport();
+            break;
     }
 
     if (t->establish(rank, peer_host, port) != 0) {

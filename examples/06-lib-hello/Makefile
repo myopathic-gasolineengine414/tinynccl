@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -I../../lib/include
-LDLIBS = -L../../lib -ltinynccl
+LDLIBS = -L../../lib -ltinynccl -libverbs
 
 all: hello
 

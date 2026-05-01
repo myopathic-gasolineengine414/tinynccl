@@ -15,5 +15,6 @@ public:
 };
 
 std::unique_ptr<Transport> make_tcp_transport();
+std::unique_ptr<Transport> make_verbs_transport();
 
 }
