@@ -92,7 +92,7 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 - [x] Configure RXE device on `wlp10s0` (runtime only — needs re-add after reboot)
 - [x] Verify with `ibv_devices` and `ibv_devinfo` (rxe0 ACTIVE, GUID 522e91fffe08b558)
 - [x] **Milestone 0.1**: TCP echo program in C++, two processes on same machine. See `examples/01-tcp-echo/`.
-- [ ] **Milestone 0.2**: libibverbs hello-world in C, two processes on same machine talking via RXE loopback. ~200 LOC. Sender posts an RDMA write of 1 byte, receiver polls completion queue. Covers: device open, PD allocation, MR registration, QP creation, QP state transitions (INIT → RTR → RTS), post send/recv, CQ polling.
+- [x] **Milestone 0.2**: libibverbs hello-world in C, two processes on same machine talking via RXE loopback. See `examples/02-verbs-hello/`. SEND/RECV (not RDMA_WRITE) for the simplest semantics; covers device open, PD, MR, CQ, QP, INIT→RTR→RTS transitions, post send/recv, CQ poll.
 - [ ] **Milestone 0.3**: CUDA hello-world. Vector add kernel on the 1080 Ti. `cudaMalloc`, `cudaMemcpy`, kernel launch, validate result.
 - [ ] **Milestone 0.4**: Register CUDA buffer with `ibv_reg_mr`, demonstrate that a GPU-resident buffer can be the source/sink of a verbs operation (single-machine RXE loopback). This is the GPU-NIC integration point.
 
