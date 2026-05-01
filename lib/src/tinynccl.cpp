@@ -10,10 +10,10 @@ namespace {
 
 class CommImpl : public Comm {
 public:
-    CommImpl(int rank, int world_size, std::unique_ptr<Transport> t)
-        : transport_(std::move(t)) {
+    CommImpl(int rank, int world_size, std::unique_ptr<Transport> t) {
         rank_ = rank;
         world_size_ = world_size;
+        transport_ = std::move(t);
     }
 
     int send(const void* buf, size_t bytes) override {
@@ -54,8 +54,10 @@ public:
     }
 
 private:
-    std::unique_ptr<Transport> transport_;
+    // Order matters: peer_buf_ must outlive transport_ so the cached MR for
+    // peer_buf_.data() can be deregistered before its backing memory frees.
     std::vector<float> peer_buf_;
+    std::unique_ptr<Transport> transport_;
 };
 
 }
