@@ -110,7 +110,7 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 
 ### Phase 2: All-reduce
 
-- [ ] **Milestone 2.1**: CPU all-reduce over TCP. Two ranks, float arrays, validate correctness.
+- [x] **Milestone 2.1**: CPU all-reduce over TCP. Two ranks, float arrays, validate correctness. See `examples/07-allreduce-tcp/`. Naive: rank 0 sends, rank 1 sends; both sum locally. `lib/` now has `Comm::all_reduce(buf, count, dtype, op)` for Float32/Sum.
 - [ ] **Milestone 2.2**: CPU all-reduce over verbs. Replace TCP transport with verbs, same correctness.
 - [ ] **Milestone 2.3**: GPU all-reduce over verbs (single chunk, naive 2-node).
 - [ ] **Milestone 2.4**: Ring all-reduce decomposition (chunked).
