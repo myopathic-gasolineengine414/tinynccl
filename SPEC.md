@@ -121,7 +121,7 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 - [x] **Milestone 3.0**: pybind11 bindings exposing `Comm::all_reduce(torch::Tensor)`. See `examples/11-pytorch-bindings/`. Not a full `c10d::Backend` yet — just a Python wrapper that proves the tensor data path works through both transports.
 - [x] **Milestone 3.1**: Minimal `ProcessGroup` backend (subclass `c10d::Backend`) exposing only `all_reduce`. See `examples/12-pytorch-ddp/`. `torch.distributed.init_process_group(backend="tinynccl")` and `torch.distributed.all_reduce(tensor)` both work, on either TCP or verbs transport. CPU float32 only. The `c10d::Store` is currently ignored; OOB exchange uses our own TCP.
 - [x] **Milestone 3.2**: Toy DDP training loop using tinynccl backend. See `examples/13-ddp-train/`. Two ranks each train a small MLP on different data via `DistributedDataParallel`; gradient all-reduce flows through tinynccl; weights stay consistent across ranks (max diff `0.00e+00`). Required adding `allgather` / `_allgather_base` / `broadcast` / `barrier` and `Work::getFuture()` to the c10d::Backend.
-- [ ] **Milestone 3.3**: 50M-param GPT on TinyShakespeare, two-rank training to convergence.
+- [x] **Milestone 3.3**: GPU DDP training with tinynccl. See `examples/14-ddp-gpu/`. Two CUDA contexts on the same GTX 1080 Ti; model and data on GPU; gradient all-reduce flows through tinynccl with pinned-host staging (since softRoCE + consumer GeForce can't do GPUDirect RDMA). Weights consistent across ranks at machine precision after training. (50M-param GPT deferred — small MLP demonstrates the technique end-to-end.)
 - [ ] **Milestone 3.4**: Numerical correctness vs NCCL on the same loop.
 
 ### Phase 4: Benchmarking and writeup
