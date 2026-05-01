@@ -41,7 +41,7 @@ The README of the repo at the end should let a NVIDIA recruiter understand in 60
 | Box           | Role         | GPU       | OS              | WiFi IP         | Direct-cable IP |
 |---------------|--------------|-----------|-----------------|-----------------|-----------------|
 | Mac           | dev workstation | n/a    | macOS           | (varies)        | n/a             |
-| `personal`    | project node 0 | GTX 1080 Ti (Pascal) | Ubuntu (already installed) | 192.168.10.206  | 10.0.0.2        |
+| `desktop`    | project node 0 | GTX 1080 Ti (Pascal) | Ubuntu (already installed) | (LAN DHCP)      | 10.0.0.2        |
 | (laptop, TBD) | project node 1 | RTX 4070 (Ada) | Ubuntu (TODO: dual-boot install) | TBD          | 10.0.0.1        |
 
 - Mac is the dev workstation only. ssh + VS Code Remote-SSH into the project boxes. Mac never participates in project traffic.
@@ -51,7 +51,7 @@ The README of the repo at the end should let a NVIDIA recruiter understand in 60
 
 ## Software stack
 
-- Ubuntu 24.04 LTS on both project boxes (currently only on `personal`)
+- Ubuntu 24.04 LTS on both project boxes (currently only on `desktop`)
 - Linux kernel with `rdma_rxe` (softRoCE) module support — included in stock Ubuntu kernels
 - userland: `libibverbs-dev`, `librdmacm-dev`, `rdma-core`
 - CUDA Toolkit 12.x (compatible with both Pascal and Ada)
@@ -101,16 +101,16 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 
 ### Phase 0: Foundation (single-machine, ongoing while waiting for Ubuntu install on laptop)
 
-- [x] ssh key auth from Mac to `personal`
-- [x] git repo skeleton on `personal` at `~/tinynccl`
-- [ ] VS Code Remote-SSH from Mac to `personal`
+- [x] ssh key auth from Mac to `desktop`
+- [x] git repo skeleton on `desktop` at `~/tinynccl`
+- [ ] VS Code Remote-SSH from Mac to `desktop`
 - [x] GitHub remote configured, first commit pushed (https://github.com/jwlutz/tinynccl, private)
-- [x] `apt update && apt upgrade` on `personal` to clear pending updates
+- [x] `apt update && apt upgrade` on `desktop` to clear pending updates
 - [x] Install build dependencies: `build-essential cmake git libibverbs-dev librdmacm-dev rdma-core ibverbs-utils perftest`
 - [ ] CUDA Toolkit 12.x installed and verified (deferred — NVIDIA driver also not present; install when Milestone 0.3 needs it)
 - [x] Load `rdma_rxe` module (persisted via `/etc/modules-load.d/rdma_rxe.conf`)
 - [x] Configure RXE device on `wlp10s0` (runtime only — needs re-add after reboot)
-- [x] Verify with `ibv_devices` and `ibv_devinfo` (rxe0 ACTIVE, GUID 522e91fffe08b558)
+- [x] Verify with `ibv_devices` and `ibv_devinfo` (rxe0 ACTIVE)
 - [x] **Milestone 0.1**: TCP echo program in C++, two processes on same machine. See `examples/01-tcp-echo/`.
 - [x] **Milestone 0.2**: libibverbs hello-world in C, two processes on same machine talking via RXE loopback. See `examples/02-verbs-hello/`. SEND/RECV (not RDMA_WRITE) for the simplest semantics; covers device open, PD, MR, CQ, QP, INIT→RTR→RTS transitions, post send/recv, CQ poll.
 - [x] **Milestone 0.3**: CUDA hello-world. Vector add kernel on the 1080 Ti. See `examples/03-cuda-vec-add/`. 1M elements summed and verified.
@@ -121,12 +121,12 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 
 - [ ] Ubuntu install on laptop, dual-boot or external SSD
 - [ ] Mirror Phase 0 setup on laptop: deps, CUDA, softRoCE
-- [ ] Static IPs on direct cable: 10.0.0.1 on laptop, 10.0.0.2 on `personal`
+- [ ] Static IPs on direct cable: 10.0.0.1 on laptop, 10.0.0.2 on `desktop`
 - [ ] `ping` succeeds across cable
 - [ ] ssh from Mac to laptop works
 - [ ] **Milestone 1.1**: TCP echo across cable. Same code as Milestone 0.1 with different IPs.
 - [ ] **Milestone 1.2**: libibverbs hello-world across cable. Same code as 0.2 with different IPs.
-- [ ] **Milestone 1.3**: GPU buffer on laptop (4070), read by `personal` via verbs over cable. Validates GPU-to-network-to-GPU data path.
+- [ ] **Milestone 1.3**: GPU buffer on laptop (4070), read by `desktop` via verbs over cable. Validates GPU-to-network-to-GPU data path.
 
 ### Phase 2: All-reduce
 
@@ -169,7 +169,7 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 - **1080 Ti is Pascal.** Supports CUDA, no Tensor Cores, no fp8. Fine for this project.
 - **4070 is Ada.** Supports everything modern. Mismatched compute capability between ranks is realistic for the project's scale and not a problem.
 - **WiFi is for dev access only.** All project traffic flows over the direct ethernet cable. Never benchmark over WiFi.
-- **`personal` has 44 pending updates** as of project start. Run `apt upgrade` and reboot before installing softRoCE / building anything serious to avoid kernel module mismatches.
+- **`desktop` has 44 pending updates** as of project start. Run `apt upgrade` and reboot before installing softRoCE / building anything serious to avoid kernel module mismatches.
 - **NCCL comparison fairness**: real NCCL will use NVLink or PCIe optimally. tinynccl will use only the verbs path. Compare apples to apples by forcing NCCL to use the same network path (set `NCCL_IB_DISABLE=0`, `NCCL_P2P_DISABLE=1` for relevant runs).
 
 ## Reference materials
@@ -183,15 +183,15 @@ Reference: PyTorch's `gloo` backend implementation (~3K LOC, in pytorch/torch/di
 
 ## Current state (as of project start)
 
-- Mac dev workstation: ssh keys generated, `~/.ssh/config` has `desktop` alias pointing at `personal`, password-less ssh confirmed working
-- `personal` (Ubuntu desktop, 1080 Ti): online, `~/tinynccl` git repo initialized, `.gitignore` in place, no code yet
+- Mac dev workstation: ssh keys generated, `~/.ssh/config` has `desktop` alias pointing at `desktop`, password-less ssh confirmed working
+- `desktop` (Ubuntu desktop, 1080 Ti): online, `~/tinynccl` git repo initialized, `.gitignore` in place, no code yet
 - Laptop (Windows + 4070): Ubuntu install pending — flash drive ordered, install scheduled when it arrives
 - Direct ethernet cable: physically connected, IPs not yet configured
 
 ## Notes for future AI agents picking this up
 
 - This spec is the source of truth for project scope and sequencing. If reality diverges, update this file rather than letting the README drift.
-- Work on `personal` is via ssh from the Mac. The Mac itself never builds or runs anything — it's the editor and orchestrator.
+- Work on `desktop` is via ssh from the Mac. The Mac itself never builds or runs anything — it's the editor and orchestrator.
 - Default to writing the smallest possible correct version of each milestone, then iterate. Don't preemptively generalize. The spec lays out the trajectory; each commit should advance one step.
 - Numerical correctness must be validated at every transport-layer change. A "fast but wrong" all-reduce is worse than no all-reduce at all and will silently break training.
 - Performance comparisons against NCCL are the project's deliverable. Save raw numbers in `results/` from day one so progressions are reproducible.
