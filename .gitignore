@@ -44,3 +44,4 @@ lib/src/*.o
 examples/*/hello
 examples/*/allreduce
 examples/*/stress
+examples/*/model.pt
