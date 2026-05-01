@@ -60,12 +60,23 @@ public:
                     "tinynccl: allreduce supports a single tensor only");
         auto& t = tensors[0];
         TORCH_CHECK(t.is_contiguous(), "tinynccl: tensor must be contiguous");
-        TORCH_CHECK(t.is_cpu(), "tinynccl: tensor must be on CPU");
         TORCH_CHECK(t.dtype() == torch::kFloat32, "tinynccl: tensor must be float32");
         TORCH_CHECK(opts.reduceOp == c10d::ReduceOp::SUM, "tinynccl: only SUM is supported");
 
-        if (comm_->all_reduce(t.data_ptr(), static_cast<size_t>(t.numel())) != 0) {
-            throw std::runtime_error("tinynccl::Comm::all_reduce failed");
+        if (t.is_cuda()) {
+            // Stage through CPU since softRoCE can't register cudaMalloc'd memory
+            // (and consumer GPUs lack GPUDirect RDMA support anyway).
+            auto host = t.cpu().contiguous();
+            if (comm_->all_reduce(host.data_ptr(),
+                                  static_cast<size_t>(host.numel())) != 0) {
+                throw std::runtime_error("tinynccl::Comm::all_reduce failed");
+            }
+            t.copy_(host);
+        } else {
+            if (comm_->all_reduce(t.data_ptr(),
+                                  static_cast<size_t>(t.numel())) != 0) {
+                throw std::runtime_error("tinynccl::Comm::all_reduce failed");
+            }
         }
         return c10::make_intrusive<TinyncclWork>(tensors);
     }
@@ -82,22 +93,24 @@ public:
         TORCH_CHECK(outputs[0].size() == 2, "tinynccl: allgather requires world_size=2");
 
         auto& input = inputs[0];
-        TORCH_CHECK(input.is_contiguous() && input.is_cpu(),
-                    "tinynccl: allgather input must be contiguous CPU");
+        TORCH_CHECK(input.is_contiguous(), "tinynccl: allgather input contiguous");
 
         const int rank = comm_->rank();
         const int peer = 1 - rank;
-        const size_t bytes = static_cast<size_t>(input.numel()) * input.element_size();
+        auto cpu_input = input.is_cuda() ? input.cpu().contiguous() : input;
+        const size_t bytes = static_cast<size_t>(cpu_input.numel()) * cpu_input.element_size();
 
         outputs[0][rank].copy_(input);
 
+        auto peer_cpu = at::empty(cpu_input.sizes(), cpu_input.options());
         if (rank == 0) {
-            if (comm_->send(input.data_ptr(), bytes) != 0) throw std::runtime_error("send");
-            if (comm_->recv(outputs[0][peer].data_ptr(), bytes) != 0) throw std::runtime_error("recv");
+            if (comm_->send(cpu_input.data_ptr(), bytes) != 0) throw std::runtime_error("send");
+            if (comm_->recv(peer_cpu.data_ptr(), bytes) != 0) throw std::runtime_error("recv");
         } else {
-            if (comm_->recv(outputs[0][peer].data_ptr(), bytes) != 0) throw std::runtime_error("recv");
-            if (comm_->send(input.data_ptr(), bytes) != 0) throw std::runtime_error("send");
+            if (comm_->recv(peer_cpu.data_ptr(), bytes) != 0) throw std::runtime_error("recv");
+            if (comm_->send(cpu_input.data_ptr(), bytes) != 0) throw std::runtime_error("send");
         }
+        outputs[0][peer].copy_(peer_cpu);
         return c10::make_intrusive<TinyncclWork>(std::vector<at::Tensor>{});
     }
 
@@ -107,26 +120,28 @@ public:
         const c10d::AllgatherOptions& /*opts*/ = c10d::AllgatherOptions()) override {
         TORCH_CHECK(input.is_contiguous() && output.is_contiguous(),
                     "tinynccl: contiguous required");
-        TORCH_CHECK(input.is_cpu() && output.is_cpu(),
-                    "tinynccl: CPU only");
 
         const int rank = comm_->rank();
-        const size_t in_bytes = static_cast<size_t>(input.numel()) * input.element_size();
-
-        // Place my chunk into output at offset rank * in_bytes.
-        std::memcpy(static_cast<char*>(output.data_ptr()) + rank * in_bytes,
-                    input.data_ptr(), in_bytes);
-
         const int peer = 1 - rank;
-        char* peer_slot = static_cast<char*>(output.data_ptr()) + peer * in_bytes;
+
+        auto cpu_input = input.is_cuda() ? input.cpu().contiguous() : input;
+        auto cpu_output = output.is_cuda()
+            ? at::empty(output.sizes(), output.options().device(at::kCPU))
+            : output;
+
+        const size_t in_bytes = static_cast<size_t>(cpu_input.numel()) * cpu_input.element_size();
+        std::memcpy(static_cast<char*>(cpu_output.data_ptr()) + rank * in_bytes,
+                    cpu_input.data_ptr(), in_bytes);
+        char* peer_slot = static_cast<char*>(cpu_output.data_ptr()) + peer * in_bytes;
 
         if (rank == 0) {
-            if (comm_->send(input.data_ptr(), in_bytes) != 0) throw std::runtime_error("send");
+            if (comm_->send(cpu_input.data_ptr(), in_bytes) != 0) throw std::runtime_error("send");
             if (comm_->recv(peer_slot, in_bytes) != 0) throw std::runtime_error("recv");
         } else {
             if (comm_->recv(peer_slot, in_bytes) != 0) throw std::runtime_error("recv");
-            if (comm_->send(input.data_ptr(), in_bytes) != 0) throw std::runtime_error("send");
+            if (comm_->send(cpu_input.data_ptr(), in_bytes) != 0) throw std::runtime_error("send");
         }
+        if (output.is_cuda()) output.copy_(cpu_output);
         return c10::make_intrusive<TinyncclWork>(std::vector<at::Tensor>{});
     }
 
@@ -135,15 +150,17 @@ public:
         const c10d::BroadcastOptions& opts = c10d::BroadcastOptions()) override {
         TORCH_CHECK(tensors.size() == 1, "tinynccl: broadcast one tensor");
         auto& t = tensors[0];
-        TORCH_CHECK(t.is_contiguous() && t.is_cpu(),
-                    "tinynccl: contiguous CPU tensor required");
+        TORCH_CHECK(t.is_contiguous(), "tinynccl: contiguous tensor required");
         const size_t bytes = static_cast<size_t>(t.numel()) * t.element_size();
         const int rank = comm_->rank();
 
         if (rank == opts.rootRank) {
-            if (comm_->send(t.data_ptr(), bytes) != 0) throw std::runtime_error("send");
+            auto cpu = t.is_cuda() ? t.cpu().contiguous() : t;
+            if (comm_->send(cpu.data_ptr(), bytes) != 0) throw std::runtime_error("send");
         } else {
-            if (comm_->recv(t.data_ptr(), bytes) != 0) throw std::runtime_error("recv");
+            auto cpu = t.is_cuda() ? at::empty(t.sizes(), t.options().device(at::kCPU)) : t;
+            if (comm_->recv(cpu.data_ptr(), bytes) != 0) throw std::runtime_error("recv");
+            if (t.is_cuda()) t.copy_(cpu);
         }
         return c10::make_intrusive<TinyncclWork>(std::vector<at::Tensor>{});
     }
