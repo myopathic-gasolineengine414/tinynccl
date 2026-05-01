@@ -34,3 +34,4 @@ profiles/
 # example binaries
 examples/*/server
 examples/*/client
+examples/*/vec_add
