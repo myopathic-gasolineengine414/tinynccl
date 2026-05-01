@@ -35,26 +35,27 @@ public:
         }
 
         const size_t bytes = count * sizeof(float);
-        std::vector<float> peer_data(count);
+        if (peer_buf_.size() < count) peer_buf_.resize(count);
 
         // Alternate to avoid deadlock on synchronous transports.
         if (rank_ == 0) {
             if (transport_->send(buf, bytes)) return -1;
-            if (transport_->recv(peer_data.data(), bytes)) return -1;
+            if (transport_->recv(peer_buf_.data(), bytes)) return -1;
         } else {
-            if (transport_->recv(peer_data.data(), bytes)) return -1;
+            if (transport_->recv(peer_buf_.data(), bytes)) return -1;
             if (transport_->send(buf, bytes)) return -1;
         }
 
         float* dst = static_cast<float*>(buf);
         for (size_t i = 0; i < count; ++i) {
-            dst[i] += peer_data[i];
+            dst[i] += peer_buf_[i];
         }
         return 0;
     }
 
 private:
     std::unique_ptr<Transport> transport_;
+    std::vector<float> peer_buf_;
 };
 
 }

@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <unordered_map>
 
 namespace tinynccl {
 
@@ -27,6 +28,8 @@ struct QpInfo {
 class VerbsTransport : public Transport {
 public:
     ~VerbsTransport() override {
+        for (auto& kv : mr_cache_) ibv_dereg_mr(kv.second.mr);
+        mr_cache_.clear();
         if (qp_) ibv_destroy_qp(qp_);
         if (cq_) ibv_destroy_cq(cq_);
         if (pd_) ibv_dealloc_pd(pd_);
@@ -70,9 +73,8 @@ public:
     }
 
     int send(const void* buf, size_t bytes) override {
-        struct ibv_mr* mr = ibv_reg_mr(pd_, const_cast<void*>(buf), bytes,
-                                       IBV_ACCESS_LOCAL_WRITE);
-        if (!mr) { std::perror("reg_mr (send)"); return -1; }
+        struct ibv_mr* mr = get_or_register(const_cast<void*>(buf), bytes);
+        if (!mr) return -1;
 
         struct ibv_sge sge = {
             reinterpret_cast<uintptr_t>(buf),
@@ -89,18 +91,14 @@ public:
         struct ibv_send_wr* bad;
         if (ibv_post_send(qp_, &wr, &bad)) {
             std::perror("post_send");
-            ibv_dereg_mr(mr);
             return -1;
         }
-
-        int rc = poll_one();
-        ibv_dereg_mr(mr);
-        return rc;
+        return poll_one();
     }
 
     int recv(void* buf, size_t bytes) override {
-        struct ibv_mr* mr = ibv_reg_mr(pd_, buf, bytes, IBV_ACCESS_LOCAL_WRITE);
-        if (!mr) { std::perror("reg_mr (recv)"); return -1; }
+        struct ibv_mr* mr = get_or_register(buf, bytes);
+        if (!mr) return -1;
 
         struct ibv_sge sge = {
             reinterpret_cast<uintptr_t>(buf),
@@ -115,16 +113,28 @@ public:
         struct ibv_recv_wr* bad;
         if (ibv_post_recv(qp_, &wr, &bad)) {
             std::perror("post_recv");
-            ibv_dereg_mr(mr);
             return -1;
         }
-
-        int rc = poll_one();
-        ibv_dereg_mr(mr);
-        return rc;
+        return poll_one();
     }
 
 private:
+    // Look up (buf,>=bytes) in the MR cache; otherwise register fresh and cache.
+    // Cache is keyed by buffer address. Stale entries are not auto-evicted, so
+    // callers should reuse buffers across calls (which is the common pattern).
+    struct ibv_mr* get_or_register(void* buf, size_t bytes) {
+        auto it = mr_cache_.find(buf);
+        if (it != mr_cache_.end()) {
+            if (it->second.bytes >= bytes) return it->second.mr;
+            ibv_dereg_mr(it->second.mr);
+            mr_cache_.erase(it);
+        }
+        struct ibv_mr* mr = ibv_reg_mr(pd_, buf, bytes, IBV_ACCESS_LOCAL_WRITE);
+        if (!mr) { std::perror("reg_mr"); return nullptr; }
+        mr_cache_[buf] = {mr, bytes};
+        return mr;
+    }
+
     int open_device() {
         struct ibv_device** devs = ibv_get_device_list(nullptr);
         if (!devs) { std::perror("ibv_get_device_list"); return -1; }
@@ -257,10 +267,13 @@ private:
         return 0;
     }
 
+    struct MrEntry { struct ibv_mr* mr; size_t bytes; };
+
     struct ibv_context* ctx_ = nullptr;
     struct ibv_pd* pd_ = nullptr;
     struct ibv_cq* cq_ = nullptr;
     struct ibv_qp* qp_ = nullptr;
+    std::unordered_map<void*, MrEntry> mr_cache_;
 };
 
 }
